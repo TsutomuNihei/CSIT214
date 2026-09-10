@@ -1,29 +1,31 @@
-/* Booking, conflict, rendering, and interaction logic. */
+/* Login, navigation, booking, and browser-side persistence logic. */
 (function () {
   "use strict";
 
-  const store = window.FacilityStore;
-  const timeSlots = [
-    "09:00 - 11:00",
-    "11:00 - 13:00",
-    "14:00 - 16:00",
-    "18:00 - 20:00"
-  ];
+  const store = window.PortalStore;
+  const hours = Array.from({ length: 15 }, (_, index) => index + 8);
+  const viewIds = ["login-view", "staff-login-view", "student-portal", "staff-portal"];
 
   const elements = {
-    form: document.querySelector("#booking-form"),
+    staffLoginLink: document.querySelector("#staff-login-link"),
+    logoutButton: document.querySelector("#logout-button"),
+    studentLoginForm: document.querySelector("#student-login-form"),
+    staffLoginForm: document.querySelector("#staff-login-form"),
+    studentLoginError: document.querySelector("#student-login-error"),
+    staffLoginError: document.querySelector("#staff-login-error"),
+    backToStudentLogin: document.querySelector("#back-to-student-login"),
+    bookingForm: document.querySelector("#booking-form"),
     facility: document.querySelector("#facility"),
+    equipmentWrap: document.querySelector("#equipment-option-wrap"),
+    equipmentOption: document.querySelector("#equipment-option"),
     date: document.querySelector("#booking-date"),
-    timeSlot: document.querySelector("#time-slot"),
-    attendees: document.querySelector("#attendees"),
-    feedback: document.querySelector("#feedback-region"),
-    summary: document.querySelector("#facility-summary"),
-    bookingsBody: document.querySelector("#bookings-body"),
-    emptyState: document.querySelector("#empty-state"),
-    bookingCount: document.querySelector("#booking-count"),
-    tabs: Array.from(document.querySelectorAll('[role="tab"]')),
-    publicPanel: document.querySelector("#public-panel"),
-    staffPanel: document.querySelector("#staff-panel")
+    startTime: document.querySelector("#start-time"),
+    endTime: document.querySelector("#end-time"),
+    feedback: document.querySelector("#booking-feedback"),
+    studentBookings: document.querySelector("#student-bookings"),
+    staffBookings: document.querySelector("#staff-bookings"),
+    accountDetails: document.querySelector("#account-details"),
+    studentTabs: Array.from(document.querySelectorAll("[data-student-tab]"))
   };
 
   function escapeHtml(value) {
@@ -35,308 +37,252 @@
       .replaceAll("'", "&#039;");
   }
 
-  function getFacility(facilityId) {
-    return store.getFacilities().find((facility) => facility.id === facilityId);
+  function showView(id) {
+    viewIds.forEach((viewId) => document.querySelector(`#${viewId}`).classList.toggle("hidden", viewId !== id));
+    const loggedIn = id === "student-portal" || id === "staff-portal";
+    elements.staffLoginLink.classList.toggle("hidden", loggedIn || id === "staff-login-view");
+    elements.logoutButton.classList.toggle("hidden", !loggedIn);
   }
 
-  /**
-   * Returns true when an active booking occupies the exact facility/date/slot.
-   */
-  function checkConflict(facilityId, date, timeSlot) {
+  function showLoginError(element, message) {
+    element.textContent = message;
+    element.classList.remove("hidden");
+  }
+
+  function getFacility(id) {
+    return store.facilities.find((facility) => facility.id === id);
+  }
+
+  function selectedEquipment(formData) {
+    return formData.get("facilityId") === "equipment" ? formData.get("equipmentOption") : "";
+  }
+
+  function toHour(time) {
+    return Number(String(time).split(":")[0]);
+  }
+
+  function checkConflict(facilityId, date, startTime, endTime, equipmentOption) {
+    const requestedStart = toHour(startTime);
+    const requestedEnd = toHour(endTime);
+
     return store.getBookings().some((booking) =>
       booking.status !== "Cancelled" &&
       booking.facilityId === facilityId &&
       booking.date === date &&
-      booking.timeSlot === timeSlot
+      requestedStart < toHour(booking.endTime) &&
+      requestedEnd > toHour(booking.startTime) &&
+      (facilityId !== "equipment" || booking.equipmentOption === equipmentOption)
     );
   }
 
-  // Exposed for easy demonstration and marking during the assignment review.
   window.checkConflict = checkConflict;
 
-  function showFeedback(type, message) {
-    const styles = type === "success"
-      ? {
-          wrapper: "border-emerald-200 bg-emerald-50 text-emerald-900",
-          icon: "bg-emerald-100 text-emerald-700",
-          path: '<path d="m7 12 3 3 7-7"/><circle cx="12" cy="12" r="9"/>'
-        }
-      : {
-          wrapper: "border-rose-200 bg-rose-50 text-rose-900",
-          icon: "bg-rose-100 text-rose-700",
-          path: '<path d="M12 8v5m0 3h.01"/><circle cx="12" cy="12" r="9"/>'
-        };
-
-    elements.feedback.innerHTML = `
-      <div role="alert" class="flex items-start gap-3 rounded-lg border p-4 ${styles.wrapper}">
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full ${styles.icon}" aria-hidden="true">
-          <svg viewBox="0 0 24 24" class="h-5 w-5 fill-none stroke-current" stroke-width="2">${styles.path}</svg>
-        </span>
-        <p class="pt-0.5 text-sm font-semibold">${escapeHtml(message)}</p>
-      </div>
-    `;
-    elements.feedback.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-
-  function clearFeedback() {
-    elements.feedback.innerHTML = "";
-  }
-
-  function renderFormOptions() {
-    const facilities = store.getFacilities();
-
-    elements.facility.innerHTML = facilities.map((facility) => `
-      <option value="${escapeHtml(facility.id)}">
-        ${escapeHtml(facility.name)}${facility.status === "closed" ? " (Closed)" : ""}
-      </option>
-    `).join("");
-
-    elements.timeSlot.innerHTML = timeSlots.map((slot) =>
-      `<option value="${slot}">${slot}</option>`
-    ).join("");
-  }
-
-  function renderFacilitySummary() {
-    const facility = getFacility(elements.facility.value);
-    if (!facility) {
-      elements.summary.innerHTML = "";
-      return;
-    }
-
-    const hasSchedule = elements.date.value && elements.timeSlot.value;
-    const conflict = hasSchedule &&
-      checkConflict(facility.id, elements.date.value, elements.timeSlot.value);
-    const open = facility.status === "available";
-    let availability = open ? "Available for bookings" : "Temporarily closed";
-    let availabilityClass = open
-      ? "bg-emerald-400/15 text-emerald-100 ring-emerald-300/20"
-      : "bg-rose-400/15 text-rose-100 ring-rose-300/20";
-
-    if (hasSchedule && open) {
-      availability = conflict ? "Selected slot is already booked" : "Selected slot is available";
-      availabilityClass = conflict
-        ? "bg-rose-400/15 text-rose-100 ring-rose-300/20"
-        : "bg-emerald-400/15 text-emerald-100 ring-emerald-300/20";
-    }
-
-    elements.summary.innerHTML = `
-      <div class="border-b border-white/10 p-6">
-        <p class="text-xs font-bold uppercase tracking-[0.18em] text-brand-100">Selected facility</p>
-        <h2 class="mt-2 text-2xl font-bold">${escapeHtml(facility.name)}</h2>
-        <span class="mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ring-1 ${availabilityClass}">
-          ${escapeHtml(availability)}
-        </span>
-      </div>
-      <dl class="grid grid-cols-2 gap-px bg-white/10">
-        <div class="bg-brand-900 p-5">
-          <dt class="text-xs font-semibold uppercase tracking-wide text-brand-100">Capacity</dt>
-          <dd class="mt-1 text-xl font-bold">${facility.capacity} people</dd>
-        </div>
-        <div class="bg-brand-900 p-5">
-          <dt class="text-xs font-semibold uppercase tracking-wide text-brand-100">Hourly rate</dt>
-          <dd class="mt-1 text-xl font-bold">$${facility.hourlyRate}/hr</dd>
-        </div>
-      </dl>
-      <div class="p-6 text-sm leading-6 text-brand-100">
-        Select a date and time to see live slot availability before confirming.
-      </div>
-    `;
-
-    elements.attendees.max = String(facility.capacity);
-  }
-
   function formatDate(dateString) {
-    const date = new Date(`${dateString}T00:00:00`);
     return new Intl.DateTimeFormat("en-AU", {
       day: "numeric",
       month: "short",
       year: "numeric"
-    }).format(date);
-  }
-
-  function renderBookings() {
-    const bookings = store.getBookings();
-    elements.bookingCount.textContent = `${bookings.length} booking${bookings.length === 1 ? "" : "s"}`;
-    elements.emptyState.classList.toggle("hidden", bookings.length !== 0);
-    elements.bookingsBody.closest("table").classList.toggle("hidden", bookings.length === 0);
-
-    elements.bookingsBody.innerHTML = bookings.map((booking) => {
-      const cancelled = booking.status === "Cancelled";
-      const statusClass = cancelled
-        ? "bg-slate-100 text-slate-600 ring-slate-200"
-        : "bg-emerald-50 text-emerald-700 ring-emerald-200";
-
-      return `
-        <tr class="${cancelled ? "bg-slate-50/60" : "bg-white"}">
-          <td class="whitespace-nowrap px-5 py-4 text-sm font-bold text-brand-700">${escapeHtml(booking.id)}</td>
-          <td class="px-5 py-4">
-            <p class="whitespace-nowrap text-sm font-semibold text-slate-900">${escapeHtml(booking.userName)}</p>
-            <p class="whitespace-nowrap text-xs text-slate-500">${escapeHtml(booking.email)}</p>
-          </td>
-          <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-700">${escapeHtml(booking.facilityName)}</td>
-          <td class="whitespace-nowrap px-5 py-4">
-            <p class="text-sm font-semibold text-slate-700">${escapeHtml(formatDate(booking.date))}</p>
-            <p class="text-xs text-slate-500">${escapeHtml(booking.timeSlot)}</p>
-          </td>
-          <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-700">${booking.attendees}</td>
-          <td class="whitespace-nowrap px-5 py-4">
-            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${statusClass}">
-              ${escapeHtml(booking.status)}
-            </span>
-          </td>
-          <td class="whitespace-nowrap px-5 py-4 text-right">
-            ${cancelled ? '<span class="text-xs font-semibold text-slate-400">No action</span>' : `
-              <button type="button" data-cancel-id="${escapeHtml(booking.id)}"
-                class="rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition hover:bg-rose-50 focus:outline-none focus:ring-4 focus:ring-rose-100">
-                Cancel Booking
-              </button>
-            `}
-          </td>
-        </tr>
-      `;
-    }).join("");
+    }).format(new Date(`${dateString}T00:00:00`));
   }
 
   function generateBookingId() {
-    const existingIds = new Set(store.getBookings().map((booking) => booking.id));
+    const ids = new Set(store.getBookings().map((booking) => booking.id));
     let id;
-
     do {
-      const number = Math.floor(10000 + Math.random() * 90000);
-      id = `BK-${number}`;
-    } while (existingIds.has(id));
-
+      id = `BK-${Math.floor(10000 + Math.random() * 90000)}`;
+    } while (ids.has(id));
     return id;
   }
 
-  function validateForm(formData) {
-    const required = ["facilityId", "date", "timeSlot", "attendees", "fullName", "email"];
-    if (required.some((field) => !String(formData.get(field) || "").trim())) {
-      return "Please complete all required fields.";
-    }
-
-    const facility = getFacility(formData.get("facilityId"));
-    if (!facility) {
-      return "Please select a valid facility.";
-    }
-    if (facility.status !== "available") {
-      return `${facility.name} is currently closed and cannot accept bookings.`;
-    }
-    if (formData.get("date") < store.today(new Date())) {
-      return "Booking date cannot be in the past.";
-    }
-
-    const attendees = Number(formData.get("attendees"));
-    if (!Number.isInteger(attendees) || attendees < 1) {
-      return "Attendee count must be a whole number greater than zero.";
-    }
-    if (attendees > facility.capacity) {
-      return `Attendee count exceeds the capacity of ${facility.name} (${facility.capacity} people).`;
-    }
-
-    const emailInput = document.querySelector("#email");
-    if (!emailInput.validity.valid) {
-      return "Please enter a valid email address.";
-    }
-
-    return "";
+  function showBookingFeedback(type, message) {
+    elements.feedback.textContent = message;
+    elements.feedback.className = `feedback ${type}`;
   }
 
-  function handleBookingSubmit(event) {
+  function bookingCard(booking, allowCancel) {
+    const cancelled = booking.status === "Cancelled";
+    const itemName = booking.equipmentOption
+      ? `${booking.facilityName} — ${booking.equipmentOption}`
+      : booking.facilityName;
+
+    return `
+      <article class="booking-card">
+        <div>
+          <div>
+            <h3>${escapeHtml(itemName)}</h3>
+            <span class="status ${cancelled ? "cancelled" : ""}">${escapeHtml(booking.status)}</span>
+          </div>
+          <p>${escapeHtml(formatDate(booking.date))} · ${escapeHtml(booking.startTime)}–${escapeHtml(booking.endTime)}</p>
+          <small>${escapeHtml(booking.id)} · Room ${escapeHtml(booking.roomNumber)}</small>
+        </div>
+        ${allowCancel && !cancelled ? `
+          <button type="button" data-cancel-id="${escapeHtml(booking.id)}" class="cancel-button">
+            Cancel booking
+          </button>
+        ` : ""}
+      </article>
+    `;
+  }
+
+  function renderBookings() {
+    const allBookings = store.getBookings();
+    const studentBookings = allBookings.filter((booking) =>
+      booking.roomNumber.toUpperCase() === store.student.roomNumber.toUpperCase() &&
+      booking.status !== "Cancelled"
+    );
+
+    elements.studentBookings.innerHTML = studentBookings.length
+      ? studentBookings.map((booking) => bookingCard(booking, true)).join("")
+      : '<div class="empty">You have no current bookings.</div>';
+
+    elements.staffBookings.innerHTML = allBookings.length
+      ? allBookings.slice().reverse().map((booking) => bookingCard(booking, true)).join("")
+      : '<div class="empty">No bookings have been made yet.</div>';
+  }
+
+  function updateEquipmentOptions() {
+    const facility = getFacility(elements.facility.value);
+    const isEquipment = facility && facility.id === "equipment";
+    elements.equipmentWrap.classList.toggle("hidden", !isEquipment);
+    elements.equipmentOption.required = isEquipment;
+    elements.equipmentOption.innerHTML = isEquipment
+      ? facility.options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("")
+      : "";
+  }
+
+  function activateStudentTab(button) {
+    elements.studentTabs.forEach((tab) => {
+      const active = tab === button;
+      tab.classList.toggle("active", active);
+      document.querySelector(`#${tab.dataset.studentTab}`).classList.toggle("hidden", !active);
+    });
+  }
+
+  function handleBooking(event) {
     event.preventDefault();
-    clearFeedback();
-
-    const formData = new FormData(elements.form);
-    const validationError = validateForm(formData);
-    if (validationError) {
-      showFeedback("error", validationError);
-      return;
-    }
-
+    const formData = new FormData(elements.bookingForm);
     const facility = getFacility(formData.get("facilityId"));
     const date = formData.get("date");
-    const timeSlot = formData.get("timeSlot");
+    const startTime = formData.get("startTime");
+    const endTime = formData.get("endTime");
+    const equipmentOption = selectedEquipment(formData);
 
-    if (checkConflict(facility.id, date, timeSlot)) {
-      showFeedback(
-        "error",
-        `Conflict Detected: ${facility.name} is already booked for ${timeSlot} on ${date}.`
-      );
-      renderFacilitySummary();
+    if (!facility || !date || !startTime || !endTime || (facility.id === "equipment" && !equipmentOption)) {
+      showBookingFeedback("error", "Please complete all booking fields.");
+      return;
+    }
+    if (date < store.today(new Date())) {
+      showBookingFeedback("error", "The booking date cannot be in the past.");
+      return;
+    }
+    const duration = toHour(endTime) - toHour(startTime);
+    if (duration <= 0) {
+      showBookingFeedback("error", "The end time must be after the start time.");
+      return;
+    }
+    if (facility.id !== "equipment" && duration > 2) {
+      showBookingFeedback("error", "Rooms can be booked for a maximum of two hours.");
+      return;
+    }
+    if (checkConflict(facility.id, date, startTime, endTime, equipmentOption)) {
+      showBookingFeedback("error", "That room or item is already booked for the selected time.");
       return;
     }
 
-    const booking = {
+    const booking = store.addBooking({
       id: generateBookingId(),
+      roomNumber: store.student.roomNumber,
+      residentName: store.student.name,
       facilityId: facility.id,
       facilityName: facility.name,
-      userName: formData.get("fullName").trim(),
-      email: formData.get("email").trim(),
-      attendees: Number(formData.get("attendees")),
+      equipmentOption,
       date,
-      timeSlot,
+      startTime,
+      endTime,
       status: "Confirmed"
-    };
-
-    store.addBooking(booking);
-    elements.form.reset();
-    elements.date.min = store.today(new Date());
-    renderFacilitySummary();
-    renderBookings();
-    showFeedback("success", `Booking confirmed. Your Booking Reference ID is ${booking.id}.`);
-  }
-
-  function activateTab(tab) {
-    elements.tabs.forEach((item) => {
-      const active = item === tab;
-      item.setAttribute("aria-selected", String(active));
-      item.tabIndex = active ? 0 : -1;
-      item.classList.toggle("border-brand-600", active);
-      item.classList.toggle("text-brand-700", active);
-      item.classList.toggle("border-transparent", !active);
-      item.classList.toggle("text-slate-500", !active);
     });
 
-    const publicActive = tab.id === "public-tab";
-    elements.publicPanel.hidden = !publicActive;
-    elements.staffPanel.hidden = publicActive;
+    elements.bookingForm.reset();
+    elements.date.min = store.today(new Date());
+    elements.startTime.value = "08:00";
+    elements.endTime.value = "10:00";
+    updateEquipmentOptions();
+    renderBookings();
+    showBookingFeedback("success", `Booking confirmed. Your reference is ${booking.id}.`);
+  }
+
+  function cancelFromClick(event) {
+    const button = event.target.closest("[data-cancel-id]");
+    if (!button) return;
+    if (store.cancelBooking(button.dataset.cancelId)) renderBookings();
   }
 
   function bindEvents() {
-    elements.form.addEventListener("submit", handleBookingSubmit);
-
-    [elements.facility, elements.date, elements.timeSlot].forEach((input) => {
-      input.addEventListener("change", renderFacilitySummary);
+    elements.staffLoginLink.addEventListener("click", () => showView("staff-login-view"));
+    elements.backToStudentLogin.addEventListener("click", () => showView("login-view"));
+    elements.logoutButton.addEventListener("click", () => {
+      elements.studentLoginForm.reset();
+      elements.staffLoginForm.reset();
+      showView("login-view");
     });
 
-    elements.tabs.forEach((tab, index) => {
-      tab.addEventListener("click", () => activateTab(tab));
-      tab.addEventListener("keydown", (event) => {
-        if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
-        event.preventDefault();
-        const offset = event.key === "ArrowRight" ? 1 : -1;
-        const nextTab = elements.tabs[(index + offset + elements.tabs.length) % elements.tabs.length];
-        activateTab(nextTab);
-        nextTab.focus();
-      });
-    });
-
-    // Delegation keeps actions working after every table rerender.
-    elements.bookingsBody.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-cancel-id]");
-      if (!button) return;
-
-      if (store.cancelBooking(button.dataset.cancelId)) {
-        renderBookings();
-        renderFacilitySummary();
+    elements.studentLoginForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(elements.studentLoginForm);
+      const roomMatches = String(formData.get("roomNumber")).trim().toUpperCase() === store.credentials.student.user;
+      const passwordMatches = formData.get("password") === store.credentials.student.password;
+      if (!roomMatches || !passwordMatches) {
+        showLoginError(elements.studentLoginError, "Incorrect room number or password.");
+        return;
       }
+      elements.studentLoginError.classList.add("hidden");
+      renderBookings();
+      showView("student-portal");
     });
+
+    elements.staffLoginForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const formData = new FormData(elements.staffLoginForm);
+      const userMatches = String(formData.get("user")).trim() === store.credentials.staff.user;
+      const passwordMatches = formData.get("password") === store.credentials.staff.password;
+      if (!userMatches || !passwordMatches) {
+        showLoginError(elements.staffLoginError, "Incorrect staff user ID or password.");
+        return;
+      }
+      elements.staffLoginError.classList.add("hidden");
+      renderBookings();
+      showView("staff-portal");
+    });
+
+    elements.studentTabs.forEach((tab) => tab.addEventListener("click", () => activateStudentTab(tab)));
+    elements.facility.addEventListener("change", updateEquipmentOptions);
+    elements.bookingForm.addEventListener("submit", handleBooking);
+    elements.studentBookings.addEventListener("click", cancelFromClick);
+    elements.staffBookings.addEventListener("click", cancelFromClick);
   }
 
   function initialise() {
-    renderFormOptions();
+    elements.facility.innerHTML = store.facilities
+      .map((facility) => `<option value="${escapeHtml(facility.id)}">${escapeHtml(facility.name)}</option>`)
+      .join("");
+    const timeOptions = hours
+      .map((hour) => {
+        const time = `${String(hour).padStart(2, "0")}:00`;
+        return `<option value="${time}">${time}</option>`;
+      })
+      .join("");
+    elements.startTime.innerHTML = timeOptions;
+    elements.endTime.innerHTML = timeOptions;
+    elements.startTime.value = "08:00";
+    elements.endTime.value = "10:00";
     elements.date.min = store.today(new Date());
-    renderFacilitySummary();
+    elements.accountDetails.innerHTML = `
+      <div><dt>Name</dt><dd>${escapeHtml(store.student.name)}</dd></div>
+      <div><dt>Room number</dt><dd>${escapeHtml(store.student.roomNumber)}</dd></div>
+      <div><dt>Email</dt><dd>${escapeHtml(store.student.email)}</dd></div>
+      <div><dt>Residence</dt><dd>${escapeHtml(store.student.residence)}</dd></div>
+    `;
+    updateEquipmentOptions();
     renderBookings();
     bindEvents();
   }

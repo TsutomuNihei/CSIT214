@@ -1,33 +1,52 @@
-/* Persistent mock data and small state helpers for the prototype. */
+/* Mock data layer. JSON-shaped records are persisted in this browser only. */
 (function () {
   "use strict";
 
-  const FACILITIES_KEY = "councilFacilities";
-  const BOOKINGS_KEY = "councilBookings";
+  const BOOKINGS_KEY = "residencePortalBookingsV1";
 
-  const defaultFacilities = [
+  const facilities = [
+    { id: "study-a", name: "Study Room A", capacity: 8 },
+    { id: "study-b", name: "Study Room B", capacity: 8 },
+    { id: "tv-room", name: "Main TV Room", capacity: 20 },
+    { id: "projector-room", name: "Projector Room", capacity: 15 },
     {
-      id: "FAC-001",
-      name: "Main Community Hall",
-      capacity: 100,
-      hourlyRate: 50,
-      status: "available"
-    },
-    {
-      id: "FAC-002",
-      name: "Studio Room B",
-      capacity: 20,
-      hourlyRate: 25,
-      status: "available"
-    },
-    {
-      id: "FAC-003",
-      name: "Sports Pavilion",
-      capacity: 40,
-      hourlyRate: 35,
-      status: "available"
+      id: "equipment",
+      name: "Equipment",
+      capacity: 1,
+      options: ["XBOX", "Baseball", "Badminton", "Football", "Basketball", "Volleyball"]
     }
   ];
+
+  const student = {
+    roomNumber: "67C",
+    name: "Proposed Student",
+    email: "student@uow.edu.au",
+    residence: "UOW Student Residence"
+  };
+  //optional remove the try catch block
+  function readBookings() {
+    const storedValue = localStorage.getItem(BOOKINGS_KEY);
+    if (!storedValue) return [];
+
+    try {
+      const bookings = JSON.parse(storedValue);
+      if (!Array.isArray(bookings)) return [];
+
+      // Convert bookings made by the earlier fixed-slot version.
+      return bookings.map((booking) => {
+        if (!booking.timeSlot || booking.startTime) return booking;
+        const [startTime, endTime] = booking.timeSlot.split(" - ");
+        return { ...booking, startTime, endTime };
+      });
+    } catch (error) {
+      console.warn("Stored bookings could not be read.", error);
+      return [];
+    }
+  }
+
+  function saveBookings(bookings) {
+    localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings));
+  }
 
   function toLocalDateString(date) {
     const year = date.getFullYear();
@@ -36,94 +55,29 @@
     return `${year}-${month}-${day}`;
   }
 
-  function tomorrowDate() {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return toLocalDateString(tomorrow);
-  }
-
-  const defaultBookings = [
-    {
-      id: "BK-10482",
-      facilityId: "FAC-001",
-      facilityName: "Main Community Hall",
-      userName: "Alex Morgan",
-      email: "alex.morgan@example.com",
-      attendees: 65,
-      date: tomorrowDate(),
-      timeSlot: "11:00 - 13:00",
-      status: "Confirmed"
+  window.PortalStore = {
+    credentials: {
+      student: { user: "67C", password: "Nyanpasu" },
+      staff: { user: "UOW rule rule", password: "SkibidiToilet" }
     },
-    {
-      id: "BK-23715",
-      facilityId: "FAC-002",
-      facilityName: "Studio Room B",
-      userName: "Priya Shah",
-      email: "priya.shah@example.com",
-      attendees: 12,
-      date: tomorrowDate(),
-      timeSlot: "14:00 - 16:00",
-      status: "Confirmed"
-    }
-  ];
+    student,
+    facilities,
 
-  function clone(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
-  function read(key, fallback) {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(key));
-      return Array.isArray(parsed) ? parsed : clone(fallback);
-    } catch (error) {
-      console.warn(`Could not read ${key}; using defaults.`, error);
-      return clone(fallback);
-    }
-  }
-
-  function write(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
-  }
-
-  // Seed each collection only once so refreshes never overwrite user changes.
-  if (localStorage.getItem(FACILITIES_KEY) === null) {
-    write(FACILITIES_KEY, defaultFacilities);
-  }
-  if (localStorage.getItem(BOOKINGS_KEY) === null) {
-    write(BOOKINGS_KEY, defaultBookings);
-  }
-
-  window.FacilityStore = {
-    getFacilities() {
-      return read(FACILITIES_KEY, defaultFacilities);
-    },
-
-    getBookings() {
-      return read(BOOKINGS_KEY, defaultBookings);
-    },
-
-    saveBookings(bookings) {
-      write(BOOKINGS_KEY, bookings);
-      return bookings;
-    },
+    getBookings: readBookings,
 
     addBooking(booking) {
-      const bookings = this.getBookings();
+      const bookings = readBookings();
       bookings.push(booking);
-      this.saveBookings(bookings);
+      saveBookings(bookings);
       return booking;
     },
 
-    cancelBooking(bookingId) {
-      const bookings = this.getBookings();
-      const booking = bookings.find((item) => item.id === bookingId);
-
-      if (!booking || booking.status === "Cancelled") {
-        return false;
-      }
-
+    cancelBooking(id) {
+      const bookings = readBookings();
+      const booking = bookings.find((item) => item.id === id);
+      if (!booking || booking.status === "Cancelled") return false;
       booking.status = "Cancelled";
-      this.saveBookings(bookings);
+      saveBookings(bookings);
       return true;
     },
 
