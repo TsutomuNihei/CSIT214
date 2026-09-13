@@ -113,7 +113,7 @@
             <span class="status ${cancelled ? "cancelled" : ""}">${escapeHtml(booking.status)}</span>
           </div>
           <p>${escapeHtml(formatDate(booking.date))} · ${escapeHtml(booking.startTime)}–${escapeHtml(booking.endTime)}</p>
-          <small>${escapeHtml(booking.id)} · Room ${escapeHtml(booking.roomNumber)}</small>
+          <small>${escapeHtml(booking.id)} · ${escapeHtml(booking.roomNumber)}</small>
         </div>
         ${allowCancel && !cancelled ? `
           <button type="button" data-cancel-id="${escapeHtml(booking.id)}" class="cancel-button">
@@ -181,11 +181,11 @@
       return;
     }
     if (facility.id !== "equipment" && duration > 2) {
-      showBookingFeedback("error", "Rooms can be booked for a maximum of two hours.");
+      showBookingFeedback("error", "Indoor rooms can be booked for a maximum of two hours.");
       return;
     }
     if (checkConflict(facility.id, date, startTime, endTime, equipmentOption)) {
-      showBookingFeedback("error", "That room or item is already booked for the selected time.");
+      showBookingFeedback("error", "That facility or item is already booked for the selected time.");
       return;
     }
 
@@ -208,7 +208,7 @@
     elements.endTime.value = "10:00";
     updateEquipmentOptions();
     renderBookings();
-    showBookingFeedback("success", `Booking confirmed. Your reference is ${booking.id}.`);
+    showBookingFeedback("success", `Booking submitted. Your reference is ${booking.id}. Status: Confirmed.`);
   }
 
   function cancelFromClick(event) {
@@ -232,7 +232,7 @@
       const roomMatches = String(formData.get("roomNumber")).trim().toUpperCase() === store.credentials.student.user;
       const passwordMatches = formData.get("password") === store.credentials.student.password;
       if (!roomMatches || !passwordMatches) {
-        showLoginError(elements.studentLoginError, "Incorrect room number or password.");
+        showLoginError(elements.studentLoginError, "Incorrect hirer account ID or password.");
         return;
       }
       elements.studentLoginError.classList.add("hidden");
@@ -278,9 +278,10 @@
     elements.date.min = store.today(new Date());
     elements.accountDetails.innerHTML = `
       <div><dt>Name</dt><dd>${escapeHtml(store.student.name)}</dd></div>
-      <div><dt>Room number</dt><dd>${escapeHtml(store.student.roomNumber)}</dd></div>
+      <div><dt>Hirer account ID</dt><dd>${escapeHtml(store.student.roomNumber)}</dd></div>
+      <div><dt>Organisation</dt><dd>${escapeHtml(store.student.organisation || store.student.residence)}</dd></div>
       <div><dt>Email</dt><dd>${escapeHtml(store.student.email)}</dd></div>
-      <div><dt>Residence</dt><dd>${escapeHtml(store.student.residence)}</dd></div>
+      <div><dt>Phone</dt><dd>${escapeHtml(store.student.phone || "Not recorded")}</dd></div>
     `;
     updateEquipmentOptions();
     renderBookings();

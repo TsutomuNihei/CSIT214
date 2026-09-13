@@ -3,17 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UOW Student Residence Portal</title>
+  <title>CoastLink Facility Booking Prototype</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="site-header">
     <div class="container header-content">
       <div class="brand">
-        <div class="logo">UOW</div>
+        <div class="logo">CL</div>
         <div>
-          <strong>Student Residence Portal</strong>
-          <small>Facility and equipment bookings</small>
+          <strong>CoastLink Council</strong>
+          <small>Community facility booking prototype</small>
         </div>
       </div>
       <button id="staff-login-link" type="button" class="header-button">Staff login</button>
@@ -23,17 +23,16 @@
 
   <main>
     <section id="login-view" class="container narrow page">
-      <h1>Resident login</h1>
+      <h1>Facility hire login</h1>
       <div class="notice">
-        <h2>Before you log in</h2>
+        <h2>Prototype access</h2>
         <p>
-          Enter your room number and residence password to book shared rooms and equipment.
-          Contact reception if you cannot access your account.
+          Use the sample hirer account to request a community facility or equipment hire.
         </p>
       </div>
       <form id="student-login-form" class="form login-form" novalidate>
-        <label for="room-number">Room number</label>
-        <input id="room-number" name="roomNumber" autocomplete="username" required placeholder="e.g. 67C">
+        <label for="room-number">Account ID</label>
+        <input id="room-number" name="roomNumber" autocomplete="username" required placeholder="eg:67C">
         <label for="student-password">Password</label>
         <input id="student-password" name="password" type="password" autocomplete="current-password" required>
         <p id="student-login-error" class="error hidden" role="alert"></p>
@@ -42,11 +41,11 @@
     </section>
 
     <section id="staff-login-view" class="container narrow page hidden">
-      <button id="back-to-student-login" type="button" class="text-button">← Resident login</button>
-      <h1>Staff login</h1>
-      <p>Authorised residence staff only.</p>
+      <button id="back-to-student-login" type="button" class="text-button">← Hirer login</button>
+      <h1>Council staff login</h1>
+      <p>Authorised venue booking officers only.</p>
       <form id="staff-login-form" class="form login-form" novalidate>
-        <label for="staff-user">User ID</label>
+        <label for="staff-user">Staff user ID</label>
         <input id="staff-user" name="user" autocomplete="username" required>
         <label for="staff-password">Password</label>
         <input id="staff-password" name="password" type="password" autocomplete="current-password" required>
@@ -56,7 +55,7 @@
     </section>
 
     <section id="student-portal" class="hidden">
-      <nav class="tabs" aria-label="Resident portal">
+      <nav class="tabs" aria-label="Hirer portal">
         <div class="container">
           <button id="booking-tab" data-student-tab="booking-panel" class="tab active">Booking</button>
           <button id="account-tab" data-student-tab="account-panel" class="tab">Account</button>
@@ -66,20 +65,20 @@
       <div class="container page">
         <section id="booking-panel">
           <div class="page-heading">
-            <span>Resident facilities</span>
+            <span>Community facilities</span>
             <h1>Make a booking</h1>
-            <p>Rooms can be booked for up to two hours. Equipment may be booked for longer.</p>
+            <p>Indoor rooms can be booked for up to two hours. Equipment may be hired for longer.</p>
           </div>
 
           <form id="booking-form" class="form card" novalidate>
             <div id="booking-feedback" class="feedback hidden" role="alert"></div>
             <div class="form-grid">
               <div class="field">
-                <label for="facility">Room or equipment *</label>
+                <label for="facility">Facility or equipment *</label>
                 <select id="facility" name="facilityId" required></select>
               </div>
               <div id="equipment-option-wrap" class="field hidden">
-                <label for="equipment-option">Equipment *</label>
+                <label for="equipment-option">Equipment item *</label>
                 <select id="equipment-option" name="equipmentOption"></select>
               </div>
               <div class="field">
@@ -95,12 +94,12 @@
                 <select id="end-time" name="endTime" required></select>
               </div>
             </div>
-            <button type="submit" class="primary-button">Confirm booking</button>
+            <button type="submit" class="primary-button">Submit booking</button>
           </form>
 
           <div class="bookings-section">
             <h2>Your current bookings</h2>
-            <p>You can cancel any active booking below.</p>
+            <p>Confirmed bookings can be cancelled below. Cancelled records remain visible to staff.</p>
             <div id="student-bookings" class="booking-list"></div>
           </div>
         </section>
@@ -114,8 +113,8 @@
             </article>
             <article class="card">
               <h2>Need help?</h2>
-              <p>Contact residence reception for login, booking, or facility assistance.</p>
-              <strong>+61 XX XXXX XXXX</strong>
+              <p>Contact CoastLink Venue Bookings for account, facility, or hire assistance.</p>
+              <strong>402188473</strong>
             </article>
           </div>
         </section>
@@ -124,16 +123,16 @@
 
     <section id="staff-portal" class="container page hidden">
       <div class="page-heading">
-        <span>Staff administration</span>
-        <h1>All residence bookings</h1>
-        <p>Review or cancel bookings made through this browser prototype.</p>
+        <span>Venue booking officer</span>
+        <h1>All facility bookings</h1>
+        <p>Review, track status, or cancel bookings stored in this browser prototype.</p>
       </div>
       <div id="staff-bookings" class="booking-list"></div>
     </section>
   </main>
 
   <footer>
-    <div class="container">UOW Student Residence Portal · Static prototype</div>
+    <div class="container">CoastLink Community Facility and Maintenance Management System · Functional prototype</div>
   </footer>
 
   <script src="data.js"></script>
