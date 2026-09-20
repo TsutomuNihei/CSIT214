@@ -26,6 +26,34 @@
     email: "buzz.lightyear@example.com",
     phone: "0412 555 018"
   };
+
+  const hirerAccounts = [
+    {
+      login: "6767C",
+      password: "Nyanpasu",
+      ...hirer
+    },
+    {
+      login: "Dhomochevsky",
+      password: "Safeguard",
+      accountId: "Dhomochevsky",
+      name: "Dhomochevsky",
+      organisation: "CoastLink Community Hirer",
+      email: "dhomochevsky@example.com",
+      phone: "Not recorded"
+    }
+  ];
+
+  function publicHirerDetails(account) {
+    return {
+      roomNumber: account.accountId,
+      name: account.name,
+      email: account.email,
+      residence: account.organisation,
+      phone: account.phone,
+      organisation: account.organisation
+    };
+  }
   /* dummy data for the bookings */
   const seedBookings = [
     {
@@ -116,19 +144,23 @@
   /* hardcoded credentials for the student and staff */
   window.PortalStore = {
     credentials: {
-      student: { user: "6767C", password: "Nyanpasu" },
+      students: hirerAccounts.map((account) => ({
+        user: account.login,
+        password: account.password
+      })),
       staff: { user: "UOW rule rule", password: "password!" }
     },
-    student: {
-      roomNumber: hirer.accountId,
-      name: hirer.name,
-      email: hirer.email,
-      residence: hirer.organisation,
-      phone: hirer.phone,
-      organisation: hirer.organisation
-    },
+    student: publicHirerDetails(hirerAccounts[0]),
     facilities,
     seedBookings,
+
+    authenticateStudent(user, password) {
+      const account = hirerAccounts.find((candidate) =>
+        candidate.login.toUpperCase() === String(user).trim().toUpperCase() &&
+        candidate.password === password
+      );
+      return account ? publicHirerDetails(account) : null;
+    },
 
     getBookings: readBookings,
     getMaintenance: readMaintenance,

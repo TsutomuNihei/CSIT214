@@ -3,6 +3,7 @@
   "use strict";
 
   const store = window.PortalStore;
+  let currentUser = store.student;
   const hours = Array.from({ length: 15 }, (_, index) => index + 8);
   const viewIds = ["login-view", "staff-login-view", "student-portal", "staff-portal"];
   /* elements for the form */
@@ -130,7 +131,7 @@
 
   function currentUserBookings() {
     return store.getBookings().filter((booking) =>
-      booking.roomNumber.toUpperCase() === store.student.roomNumber.toUpperCase() &&
+      booking.roomNumber.toUpperCase() === currentUser.roomNumber.toUpperCase() &&
       isCurrentBooking(booking)
     );
   }
@@ -262,8 +263,8 @@
 
     const booking = store.addBooking({
       id: generateBookingId(),
-      roomNumber: store.student.roomNumber,
-      residentName: store.student.name,
+      roomNumber: currentUser.roomNumber,
+      residentName: currentUser.name,
       facilityId: facility.id,
       facilityName: facility.name,
       equipmentOption,
@@ -368,19 +369,24 @@
       elements.studentLoginForm.reset();
       elements.staffLoginForm.reset();
       elements.maintenanceForm.reset();
+      currentUser = store.student;
       showView("login-view");
     });
 
     elements.studentLoginForm.addEventListener("submit", (event) => {
       event.preventDefault();
       const formData = new FormData(elements.studentLoginForm);
-      const roomMatches = String(formData.get("roomNumber")).trim().toUpperCase() === store.credentials.student.user;
-      const passwordMatches = formData.get("password") === store.credentials.student.password;
-      if (!roomMatches || !passwordMatches) {
+      const authenticatedUser = store.authenticateStudent(
+        formData.get("roomNumber"),
+        formData.get("password")
+      );
+      if (!authenticatedUser) {
         showLoginError(elements.studentLoginError, "Incorrect hirer account ID or password.");
         return;
       }
+      currentUser = authenticatedUser;
       elements.studentLoginError.classList.add("hidden");
+      renderAccountDetails();
       renderBookings();
       showView("student-portal");
     });
@@ -409,6 +415,16 @@
     elements.studentBookings.addEventListener("click", cancelFromClick);
     elements.staffBookings.addEventListener("click", cancelFromClick);
   }
+  function renderAccountDetails() {
+    elements.accountDetails.innerHTML = `
+      <div><dt>Name</dt><dd>${escapeHtml(currentUser.name)}</dd></div>
+      <div><dt>Hirer account ID</dt><dd>${escapeHtml(currentUser.roomNumber)}</dd></div>
+      <div><dt>Organisation</dt><dd>${escapeHtml(currentUser.organisation || currentUser.residence)}</dd></div>
+      <div><dt>Email</dt><dd>${escapeHtml(currentUser.email)}</dd></div>
+      <div><dt>Phone</dt><dd>${escapeHtml(currentUser.phone || "Not recorded")}</dd></div>
+    `;
+  }
+
   /* function to initialise the form, returns the form after saving for user to view */
   function initialise() {
     const facilityOptions = store.facilities
@@ -433,13 +449,7 @@
     elements.date.min = store.today(new Date());
     elements.date.max = maximumBookingDate();
     elements.maintenanceDate.min = store.today(new Date());
-    elements.accountDetails.innerHTML = `
-      <div><dt>Name</dt><dd>${escapeHtml(store.student.name)}</dd></div>
-      <div><dt>Hirer account ID</dt><dd>${escapeHtml(store.student.roomNumber)}</dd></div>
-      <div><dt>Organisation</dt><dd>${escapeHtml(store.student.organisation || store.student.residence)}</dd></div>
-      <div><dt>Email</dt><dd>${escapeHtml(store.student.email)}</dd></div>
-      <div><dt>Phone</dt><dd>${escapeHtml(store.student.phone || "Not recorded")}</dd></div>
-    `;
+    renderAccountDetails();
     updateEquipmentOptions();
     updateMaintenanceEquipmentOptions();
     renderBookings();

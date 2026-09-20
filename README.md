@@ -11,6 +11,9 @@ Credentials required to access the prototype are below
 - Account ID: 6767C
 - Password: Nyanpasu
 
+- Account ID: Dhomochevsky
+- Password: Safeguard
+
  Staff
 
 - User ID: UOW rule rule
