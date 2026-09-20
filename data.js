@@ -3,7 +3,8 @@
   "use strict";
 
   const BOOKINGS_KEY = "coastlinkBookingsV1";
-
+  const MAINTENANCE_KEY = "coastlinkMaintenanceV1";
+  /* facility names and equipment for the form */
   const facilities = [
     { id: "harbour-hall", name: "Badminton Court", capacity: 120, type: "room" },
     { id: "seaside-meeting", name: "Seaside Meeting Room", capacity: 20, type: "room" },
@@ -14,7 +15,7 @@
       name: "Equipment hire",
       capacity: 1,
       type: "equipment",
-      options: ["Portable PA system", "Projector kit", "BBQ trailer", "Goal nets", "Line marker", "Folding tables"]
+      options: ["Portable PA system", "Projector kit", "BBQ trailer", "Goal nets", "Line marker", "Folding tables", "XBOX X"]
     }
   ];
 
@@ -25,7 +26,7 @@
     email: "buzz.lightyear@example.com",
     phone: "0412 555 018"
   };
-
+  /* dummy data for the bookings */
   const seedBookings = [
     {
       id: "BK-10421",
@@ -64,7 +65,7 @@
       status: "Cancelled"
     }
   ];
-
+  /* read bookings from local storage */
   function readBookings() {
     const storedValue = localStorage.getItem(BOOKINGS_KEY);
     if (!storedValue) {
@@ -90,13 +91,29 @@
     localStorage.setItem(BOOKINGS_KEY, JSON.stringify(bookings));
   }
 
+  function readMaintenance() {
+    try {
+      const records = JSON.parse(localStorage.getItem(MAINTENANCE_KEY) || "[]");
+      return Array.isArray(records) ? records : [];
+    } catch (error) {
+      console.warn("Stored maintenance could not be read.", error);
+      return [];
+    }
+  }
+
+  /* function to save maintenance records into local storage */
+  function saveMaintenance(records) {
+    localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(records));
+  }
+  /* convert date to local date string else cant be stored in local storage */
   function toLocalDateString(date) {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   }
-
+  /* storing the dummy data in local */
+  /* hardcoded credentials for the student and staff */
   window.PortalStore = {
     credentials: {
       student: { user: "6767C", password: "Nyanpasu" },
@@ -114,7 +131,9 @@
     seedBookings,
 
     getBookings: readBookings,
+    getMaintenance: readMaintenance,
 
+    /* function to add a booking into system, returns the booking after saving for user to view */
     addBooking(booking) {
       const bookings = readBookings();
       bookings.push(booking);
@@ -122,6 +141,7 @@
       return booking;
     },
 
+    /* function to cancel a booking, returns true if successful, false if not successful */
     cancelBooking(id) {
       const bookings = readBookings();
       const booking = bookings.find((item) => item.id === id);
@@ -129,6 +149,13 @@
       booking.status = "Cancelled";
       saveBookings(bookings);
       return true;
+    },
+    /* function to add maintenance records into system, returns the record after saving for admin to view */
+    addMaintenance(record) {
+      const records = readMaintenance();
+      records.push(record);
+      saveMaintenance(records);
+      return record;
     },
 
     today: toLocalDateString

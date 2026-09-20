@@ -5,7 +5,7 @@
   const store = window.PortalStore;
   const hours = Array.from({ length: 15 }, (_, index) => index + 8);
   const viewIds = ["login-view", "staff-login-view", "student-portal", "staff-portal"];
-
+  /* elements for the form */
   const elements = {
     staffLoginLink: document.querySelector("#staff-login-link"),
     logoutButton: document.querySelector("#logout-button"),
@@ -25,9 +25,19 @@
     studentBookings: document.querySelector("#student-bookings"),
     staffBookings: document.querySelector("#staff-bookings"),
     accountDetails: document.querySelector("#account-details"),
-    studentTabs: Array.from(document.querySelectorAll("[data-student-tab]"))
+    studentTabs: Array.from(document.querySelectorAll("[data-student-tab]")),
+    staffTabs: Array.from(document.querySelectorAll("[data-staff-tab]")),
+    maintenanceForm: document.querySelector("#maintenance-form"),
+    maintenanceFacility: document.querySelector("#maintenance-facility"),
+    maintenanceEquipmentWrap: document.querySelector("#maintenance-equipment-wrap"),
+    maintenanceEquipment: document.querySelector("#maintenance-equipment"),
+    maintenanceDate: document.querySelector("#maintenance-date"),
+    maintenanceStart: document.querySelector("#maintenance-start"),
+    maintenanceEnd: document.querySelector("#maintenance-end"),
+    maintenanceFeedback: document.querySelector("#maintenance-feedback"),
+    maintenanceList: document.querySelector("#maintenance-list")
   };
-
+  
   function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -61,18 +71,31 @@
     return Number(String(time).split(":")[0]);
   }
 
-  function checkConflict(facilityId, date, startTime, endTime, equipmentOption) {
-    const requestedStart = toHour(startTime);
-    const requestedEnd = toHour(endTime);
+  function resourcesMatch(record, facilityId, equipmentOption) {
+    return record.facilityId === facilityId &&
+      (facilityId !== "equipment" || record.equipmentOption === equipmentOption);
+  }
 
-    return store.getBookings().some((booking) =>
+  function timesOverlap(record, startTime, endTime) {
+    return toHour(startTime) < toHour(record.endTime) &&
+      toHour(endTime) > toHour(record.startTime);
+  }
+
+  function checkConflict(facilityId, date, startTime, endTime, equipmentOption) {
+    const bookingConflict = store.getBookings().some((booking) =>
       booking.status !== "Cancelled" &&
-      booking.facilityId === facilityId &&
       booking.date === date &&
-      requestedStart < toHour(booking.endTime) &&
-      requestedEnd > toHour(booking.startTime) &&
-      (facilityId !== "equipment" || booking.equipmentOption === equipmentOption)
+      resourcesMatch(booking, facilityId, equipmentOption) &&
+      timesOverlap(booking, startTime, endTime)
     );
+
+    const maintenanceConflict = store.getMaintenance().some((record) =>
+      record.date === date &&
+      resourcesMatch(record, facilityId, equipmentOption) &&
+      timesOverlap(record, startTime, endTime)
+    );
+
+    return bookingConflict || maintenanceConflict;
   }
 
   window.checkConflict = checkConflict;
@@ -84,7 +107,7 @@
       year: "numeric"
     }).format(new Date(`${dateString}T00:00:00`));
   }
-
+  /* function to generate a booking id, returns the id after saving for user to view */
   function generateBookingId() {
     const ids = new Set(store.getBookings().map((booking) => booking.id));
     let id;
@@ -94,9 +117,28 @@
     return id;
   }
 
-  function showBookingFeedback(type, message) {
-    elements.feedback.textContent = message;
-    elements.feedback.className = `feedback ${type}`;
+  function showFeedback(element, type, message) {
+    element.textContent = message;
+    element.className = `feedback ${type}`;
+  }
+
+  function isCurrentBooking(booking) {
+    if (booking.status === "Cancelled") return false;
+    const end = new Date(`${booking.date}T${booking.endTime}:00`);
+    return end > new Date();
+  }
+
+  function currentUserBookings() {
+    return store.getBookings().filter((booking) =>
+      booking.roomNumber.toUpperCase() === store.student.roomNumber.toUpperCase() &&
+      isCurrentBooking(booking)
+    );
+  }
+
+  function maximumBookingDate() {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() + 1);
+    return store.today(date);
   }
 
   function bookingCard(booking, allowCancel) {
@@ -126,10 +168,7 @@
 
   function renderBookings() {
     const allBookings = store.getBookings();
-    const studentBookings = allBookings.filter((booking) =>
-      booking.roomNumber.toUpperCase() === store.student.roomNumber.toUpperCase() &&
-      booking.status !== "Cancelled"
-    );
+    const studentBookings = currentUserBookings();
 
     elements.studentBookings.innerHTML = studentBookings.length
       ? studentBookings.map((booking) => bookingCard(booking, true)).join("")
@@ -140,14 +179,26 @@
       : '<div class="empty">No bookings have been made yet.</div>';
   }
 
-  function updateEquipmentOptions() {
-    const facility = getFacility(elements.facility.value);
+  function updateEquipmentSelect(facilitySelect, wrap, equipmentSelect) {
+    const facility = getFacility(facilitySelect.value);
     const isEquipment = facility && facility.id === "equipment";
-    elements.equipmentWrap.classList.toggle("hidden", !isEquipment);
-    elements.equipmentOption.required = isEquipment;
-    elements.equipmentOption.innerHTML = isEquipment
+    wrap.classList.toggle("hidden", !isEquipment);
+    equipmentSelect.required = isEquipment;
+    equipmentSelect.innerHTML = isEquipment
       ? facility.options.map((option) => `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`).join("")
       : "";
+  }
+
+  function updateEquipmentOptions() {
+    updateEquipmentSelect(elements.facility, elements.equipmentWrap, elements.equipmentOption);
+  }
+
+  function updateMaintenanceEquipmentOptions() {
+    updateEquipmentSelect(
+      elements.maintenanceFacility,
+      elements.maintenanceEquipmentWrap,
+      elements.maintenanceEquipment
+    );
   }
 
   function activateStudentTab(button) {
@@ -155,6 +206,14 @@
       const active = tab === button;
       tab.classList.toggle("active", active);
       document.querySelector(`#${tab.dataset.studentTab}`).classList.toggle("hidden", !active);
+    });
+  }
+
+  function activateStaffTab(button) {
+    elements.staffTabs.forEach((tab) => {
+      const active = tab === button;
+      tab.classList.toggle("active", active);
+      document.querySelector(`#${tab.dataset.staffTab}`).classList.toggle("hidden", !active);
     });
   }
 
@@ -168,24 +227,36 @@
     const equipmentOption = selectedEquipment(formData);
 
     if (!facility || !date || !startTime || !endTime || (facility.id === "equipment" && !equipmentOption)) {
-      showBookingFeedback("error", "Please complete all booking fields.");
+      showFeedback(elements.feedback, "error", "Please complete all booking fields.");
       return;
     }
     if (date < store.today(new Date())) {
-      showBookingFeedback("error", "The booking date cannot be in the past.");
+      showFeedback(elements.feedback, "error", "The booking date cannot be in the past.");
+      return;
+    }
+    if (date > maximumBookingDate()) {
+      showFeedback(elements.feedback, "error", "Bookings can only be made up to one year in advance.");
       return;
     }
     const duration = toHour(endTime) - toHour(startTime);
     if (duration <= 0) {
-      showBookingFeedback("error", "The end time must be after the start time.");
+      showFeedback(elements.feedback, "error", "The end time must be after the start time.");
       return;
     }
     if (facility.id !== "equipment" && duration > 2) {
-      showBookingFeedback("error", "Indoor rooms can be booked for a maximum of two hours.");
+      showFeedback(elements.feedback, "error", "Indoor rooms can be booked for a maximum of two hours.");
+      return;
+    }
+    if (currentUserBookings().length >= 3) {
+      showFeedback(
+        elements.feedback,
+        "error",
+        "Maximum of 3 current bookings reached. Further bookings are only available after a current booking expires or is cancelled."
+      );
       return;
     }
     if (checkConflict(facility.id, date, startTime, endTime, equipmentOption)) {
-      showBookingFeedback("error", "That facility or item is already booked for the selected time.");
+      showFeedback(elements.feedback, "error", "That facility or item is unavailable because it is booked or under maintenance.");
       return;
     }
 
@@ -208,7 +279,80 @@
     elements.endTime.value = "10:00";
     updateEquipmentOptions();
     renderBookings();
-    showBookingFeedback("success", `Booking submitted. Your reference is ${booking.id}. Status: Confirmed.`);
+    showFeedback(elements.feedback, "success", `Booking submitted. Your reference is ${booking.id}. Status: Confirmed.`);
+  }
+
+  function renderMaintenance() {
+    const records = store.getMaintenance().slice().reverse();
+    elements.maintenanceList.innerHTML = records.length
+      ? records.map((record) => {
+          const itemName = record.equipmentOption
+            ? `${record.facilityName} — ${record.equipmentOption}`
+            : record.facilityName;
+          return `
+            <article class="booking-card">
+              <div>
+                <div>
+                  <h3>${escapeHtml(itemName)}</h3>
+                  <span class="status maintenance">Maintenance</span>
+                </div>
+                <p>${escapeHtml(formatDate(record.date))} · ${escapeHtml(record.startTime)}–${escapeHtml(record.endTime)}</p>
+                <small>${escapeHtml(record.id)} · ${escapeHtml(record.notes)}</small>
+              </div>
+            </article>
+          `;
+        }).join("")
+      : '<div class="empty">No maintenance has been scheduled.</div>';
+  }
+ 
+  /* function to handle maintenance bookings, returns the record after saving for admin to view */
+  function handleMaintenance(event) {
+    event.preventDefault();
+    const formData = new FormData(elements.maintenanceForm);
+    const facility = getFacility(formData.get("facilityId"));
+    const equipmentOption = formData.get("facilityId") === "equipment"
+      ? formData.get("equipmentOption")
+      : "";
+    const date = formData.get("date");
+    const startTime = formData.get("startTime");
+    const endTime = formData.get("endTime");
+    const notes = String(formData.get("notes") || "").trim();
+    /* logical checking via if statements */
+    if (!facility || !date || !startTime || !endTime || !notes ||
+        (facility.id === "equipment" && !equipmentOption)) {
+      showFeedback(elements.maintenanceFeedback, "error", "Please complete all maintenance fields.");
+      return;
+    }
+    if (date < store.today(new Date())) {
+      showFeedback(elements.maintenanceFeedback, "error", "Maintenance cannot be scheduled in the past.");
+      return;
+    }
+    if (toHour(endTime) <= toHour(startTime)) {
+      showFeedback(elements.maintenanceFeedback, "error", "The end time must be after the start time.");
+      return;
+    }
+    if (checkConflict(facility.id, date, startTime, endTime, equipmentOption)) {
+      showFeedback(elements.maintenanceFeedback, "error", "That facility or item already has a booking or maintenance during this time.");
+      return;
+    }
+
+    const record = store.addMaintenance({
+      id: `MT-${Date.now().toString().slice(-6)}`,
+      facilityId: facility.id,
+      facilityName: facility.name,
+      equipmentOption,
+      date,
+      startTime,
+      endTime,
+      notes
+    });
+
+    elements.maintenanceForm.reset();
+    elements.maintenanceStart.value = "08:00";
+    elements.maintenanceEnd.value = "10:00";
+    updateMaintenanceEquipmentOptions();
+    renderMaintenance();
+    showFeedback(elements.maintenanceFeedback, "success", `Maintenance scheduled. Reference: ${record.id}.`);
   }
 
   function cancelFromClick(event) {
@@ -223,6 +367,7 @@
     elements.logoutButton.addEventListener("click", () => {
       elements.studentLoginForm.reset();
       elements.staffLoginForm.reset();
+      elements.maintenanceForm.reset();
       showView("login-view");
     });
 
@@ -251,20 +396,26 @@
       }
       elements.staffLoginError.classList.add("hidden");
       renderBookings();
+      renderMaintenance();
       showView("staff-portal");
     });
 
     elements.studentTabs.forEach((tab) => tab.addEventListener("click", () => activateStudentTab(tab)));
+    elements.staffTabs.forEach((tab) => tab.addEventListener("click", () => activateStaffTab(tab)));
     elements.facility.addEventListener("change", updateEquipmentOptions);
+    elements.maintenanceFacility.addEventListener("change", updateMaintenanceEquipmentOptions);
     elements.bookingForm.addEventListener("submit", handleBooking);
+    elements.maintenanceForm.addEventListener("submit", handleMaintenance);
     elements.studentBookings.addEventListener("click", cancelFromClick);
     elements.staffBookings.addEventListener("click", cancelFromClick);
   }
-
+  /* function to initialise the form, returns the form after saving for user to view */
   function initialise() {
-    elements.facility.innerHTML = store.facilities
+    const facilityOptions = store.facilities
       .map((facility) => `<option value="${escapeHtml(facility.id)}">${escapeHtml(facility.name)}</option>`)
       .join("");
+    elements.facility.innerHTML = facilityOptions;
+    elements.maintenanceFacility.innerHTML = facilityOptions;
     const timeOptions = hours
       .map((hour) => {
         const time = `${String(hour).padStart(2, "0")}:00`;
@@ -273,9 +424,15 @@
       .join("");
     elements.startTime.innerHTML = timeOptions;
     elements.endTime.innerHTML = timeOptions;
+    elements.maintenanceStart.innerHTML = timeOptions;
+    elements.maintenanceEnd.innerHTML = timeOptions;
     elements.startTime.value = "08:00";
     elements.endTime.value = "10:00";
+    elements.maintenanceStart.value = "08:00";
+    elements.maintenanceEnd.value = "10:00";
     elements.date.min = store.today(new Date());
+    elements.date.max = maximumBookingDate();
+    elements.maintenanceDate.min = store.today(new Date());
     elements.accountDetails.innerHTML = `
       <div><dt>Name</dt><dd>${escapeHtml(store.student.name)}</dd></div>
       <div><dt>Hirer account ID</dt><dd>${escapeHtml(store.student.roomNumber)}</dd></div>
@@ -284,7 +441,9 @@
       <div><dt>Phone</dt><dd>${escapeHtml(store.student.phone || "Not recorded")}</dd></div>
     `;
     updateEquipmentOptions();
+    updateMaintenanceEquipmentOptions();
     renderBookings();
+    renderMaintenance();
     bindEvents();
   }
 

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8"> 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CoastLink Facility Booking Prototype</title>
   <link rel="stylesheet" href="styles.css">
@@ -121,13 +121,68 @@
       </div>
     </section>
 
-    <section id="staff-portal" class="container page hidden">
-      <div class="page-heading">
-        <span>Venue booking officer</span>
-        <h1>All facility bookings</h1>
-        <p>Review, track status, or cancel bookings stored in this browser prototype.</p>
+    <section id="staff-portal" class="hidden">
+      <nav class="tabs" aria-label="Staff portal">
+        <div class="container">
+          <button data-staff-tab="staff-bookings-panel" class="tab active">Bookings</button>
+          <button data-staff-tab="maintenance-panel" class="tab">Maintenance</button>
+        </div>
+      </nav>
+
+      <div class="container page">
+        <section id="staff-bookings-panel">
+          <div class="page-heading">
+            <span>Venue booking officer</span>
+            <h1>All facility bookings</h1>
+            <p>Review, track status, or cancel bookings stored in this browser prototype.</p>
+          </div>
+          <div id="staff-bookings" class="booking-list"></div>
+        </section>
+
+        <section id="maintenance-panel" class="hidden">
+          <div class="page-heading">
+            <span>Facility administration</span>
+            <h1>Schedule maintenance</h1>
+            <p>Block a facility or equipment item while maintenance is carried out.</p>
+          </div>
+
+          <form id="maintenance-form" class="form card" novalidate>
+            <div id="maintenance-feedback" class="feedback hidden" role="alert"></div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="maintenance-facility">Facility or equipment *</label>
+                <select id="maintenance-facility" name="facilityId" required></select>
+              </div>
+              <div id="maintenance-equipment-wrap" class="field hidden">
+                <label for="maintenance-equipment">Equipment item *</label>
+                <select id="maintenance-equipment" name="equipmentOption"></select>
+              </div>
+              <div class="field">
+                <label for="maintenance-date">Date *</label>
+                <input id="maintenance-date" name="date" type="date" required>
+              </div>
+              <div class="field">
+                <label for="maintenance-start">Start time *</label>
+                <select id="maintenance-start" name="startTime" required></select>
+              </div>
+              <div class="field">
+                <label for="maintenance-end">End time *</label>
+                <select id="maintenance-end" name="endTime" required></select>
+              </div>
+              <div class="field">
+                <label for="maintenance-notes">Maintenance details *</label>
+                <input id="maintenance-notes" name="notes" required placeholder="e.g. Projector inspection">
+              </div>
+            </div>
+            <button type="submit" class="primary-button">Schedule maintenance</button>
+          </form>
+
+          <div class="bookings-section">
+            <h2>Scheduled maintenance</h2>
+            <div id="maintenance-list" class="booking-list"></div>
+          </div>
+        </section>
       </div>
-      <div id="staff-bookings" class="booking-list"></div>
     </section>
   </main>
 

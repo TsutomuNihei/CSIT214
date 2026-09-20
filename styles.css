@@ -16,7 +16,7 @@ body {
 button,
 input,
 select {
-  font: Consolas;
+  font: Consolas; /* might need to change from consolas */
 }
 
 button {
@@ -52,12 +52,12 @@ h1 {
 
 .site-header {
   color: white;
-  background: #001f4d;
+  background: #38bdf8; /* sky blue colour, since stakeholder requested brighter colours for header */
 }
 
 .header-content,
 .brand {
-  display: flex;
+  display: flex; /* for resizing */
   align-items: center;
 }
 
@@ -307,6 +307,11 @@ h1 {
 .status.cancelled {
   color: #687386;
   background: #eceef1;
+}
+
+.status.maintenance {
+  color: #8a4b08;
+  background: #fff3d6;
 }
 
 .cancel-button {
